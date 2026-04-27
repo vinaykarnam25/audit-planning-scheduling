@@ -358,3 +358,76 @@ Testing that flask-limiter correctly blocks excessive requests.
 ---
 
 *Last updated: Day 5 — 18 April 2026 | AI Developer 3*
+
+---
+
+## 8. OWASP ZAP Baseline Scan Results (Day 7)
+
+**Scan Date:** 27 April 2026
+**ZAP Version:** 2.17.0
+**Target:** http://localhost:5000
+**Tested By:** AI Developer 3
+**Report File:** zap-report.html
+
+---
+
+### Findings Summary
+
+| # | Finding | Severity | Status |
+|---|---------|----------|--------|
+| 1 | Content Security Policy (CSP) Header Not Set | Medium | To Fix on Day 12 |
+| 2 | HTTP Only Site | Low | Accepted for dev |
+| 3 | Server Leaks Version Information | Low | To Fix on Day 12 |
+| 4 | X-Content-Type-Options Header Missing | Low | To Fix on Day 12 |
+
+---
+
+### Finding 1 — Content Security Policy (CSP) Header Not Set
+**Severity:** Medium
+
+**What it means:** The app does not tell browsers what content is allowed to load. This makes XSS attacks easier.
+
+**Fix:** Add CSP header using flask-talisman on Day 12.
+
+---
+
+### Finding 2 — HTTP Only Site
+**Severity:** Low
+
+**What it means:** App runs on HTTP not HTTPS. Data sent unencrypted.
+
+**Fix:** Accepted for local development. HTTPS enforced in production via Docker.
+
+---
+
+### Finding 3 — Server Leaks Version Information
+**Severity:** Low
+
+**What it means:** Flask sends its version number in headers. Attackers can use this to find known vulnerabilities.
+
+**Fix:** Hide server version using flask-talisman on Day 12.
+
+---
+
+### Finding 4 — X-Content-Type-Options Header Missing
+**Severity:** Low
+
+**What it means:** Browsers might guess content type incorrectly, leading to security issues.
+
+**Fix:** Add X-Content-Type-Options: nosniff header via flask-talisman on Day 12.
+
+---
+
+### ZAP Scan Summary
+
+| Severity | Count | Action |
+|----------|-------|--------|
+| Critical | 0 | None needed |
+| High | 0 | None needed |
+| Medium | 1 | Fix on Day 12 |
+| Low | 3 | Fix on Day 12 (2) + Accepted (1) |
+
+**Overall: No Critical or High findings!**
+All Medium and Low findings will be resolved on Day 12 using flask-talisman.
+
+*Last updated: Day 7 — 22 April 2026 | AI Developer 3*
