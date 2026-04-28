@@ -1,7 +1,7 @@
 """
-app.py — Flask Entry Point with Rate Limiting
+app.py — Flask Entry Point with Security Headers + Rate Limiting
 Tool-21: Audit Planning and Scheduling
-AI Developer 3 — Day 4 Task
+AI Developer 3 — Day 8 Task
 """
 
 from flask import Flask, jsonify, request
@@ -13,7 +13,33 @@ app = Flask(__name__)
 
 
 # ─────────────────────────────────────────────
-# 1. SETUP FLASK-LIMITER
+# 1. ADD SECURITY HEADERS TO EVERY RESPONSE
+# This fixes all ZAP findings from Day 7
+# ─────────────────────────────────────────────
+@app.after_request
+def add_security_headers(response):
+    # Fixes Finding 4 — X-Content-Type-Options Missing
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+
+    # Fixes Finding 1 — Content Security Policy Not Set
+    response.headers['Content-Security-Policy'] = "default-src 'self'"
+
+    # Fixes ZAP — X-Frame-Options Missing
+    # Stops your app being loaded inside another website (clickjacking)
+    response.headers['X-Frame-Options'] = 'DENY'
+
+    # Extra security headers (best practice)
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+
+    # Fixes Finding 3 — Hide Flask version from Server header
+    response.headers['Server'] = 'Tool-21-AI-Service'
+
+    return response
+
+
+# ─────────────────────────────────────────────
+# 2. SETUP FLASK-LIMITER
 # Default limit: 30 requests per minute per IP
 # ─────────────────────────────────────────────
 limiter = Limiter(
@@ -25,7 +51,7 @@ limiter = Limiter(
 
 
 # ─────────────────────────────────────────────
-# 2. CUSTOM ERROR HANDLER FOR 429
+# 3. CUSTOM ERROR HANDLER FOR 429
 # Returns clear error message with retry_after
 # ─────────────────────────────────────────────
 @app.errorhandler(429)
@@ -40,7 +66,7 @@ def rate_limit_exceeded(e):
 
 
 # ─────────────────────────────────────────────
-# 3. HEALTH CHECK ENDPOINT
+# 4. HEALTH CHECK ENDPOINT
 # No rate limit on health check
 # ─────────────────────────────────────────────
 @app.route("/health", methods=["GET"])
@@ -49,6 +75,12 @@ def health():
     return jsonify({
         "status": "ok",
         "message": "AI service is running",
+        "security_headers": {
+            "X-Content-Type-Options": "nosniff",
+            "X-Frame-Options": "DENY",
+            "Content-Security-Policy": "default-src 'self'",
+            "X-XSS-Protection": "1; mode=block"
+        },
         "rate_limits": {
             "default": "30 requests per minute",
             "generate_report": "10 requests per minute"
@@ -57,44 +89,74 @@ def health():
 
 
 # ─────────────────────────────────────────────
-# 4. DESCRIBE ENDPOINT — 30 req/min
+# 5. DESCRIBE ENDPOINT — 30 req/min
 # ─────────────────────────────────────────────
 @app.route("/describe", methods=["POST"])
 @sanitise_input
 def describe():
     clean_body = request.sanitised_body
-    return jsonify({"message": "Describe endpoint working!", "received": clean_body, "status": 200}), 200
+    return jsonify({
+        "message": "Describe endpoint working!",
+        "received": clean_body,
+        "status": 200
+    }), 200
 
 
 # ─────────────────────────────────────────────
-# 5. RECOMMEND ENDPOINT — 30 req/min
+# 6. RECOMMEND ENDPOINT — 30 req/min
 # ─────────────────────────────────────────────
 @app.route("/recommend", methods=["POST"])
 @sanitise_input
 def recommend():
     clean_body = request.sanitised_body
-    return jsonify({"message": "Recommend endpoint working!", "received": clean_body, "status": 200}), 200
+    return jsonify({
+        "message": "Recommend endpoint working!",
+        "received": clean_body,
+        "status": 200
+    }), 200
 
 
 # ─────────────────────────────────────────────
-# 6. GENERATE REPORT — Strict 10 req/min
+# 7. GENERATE REPORT — Strict 10 req/min
 # ─────────────────────────────────────────────
 @app.route("/generate-report", methods=["POST"])
 @limiter.limit("10 per minute")
 @sanitise_input
 def generate_report():
     clean_body = request.sanitised_body
-    return jsonify({"message": "Generate report endpoint working!", "received": clean_body, "status": 200}), 200
+    return jsonify({
+        "message": "Generate report endpoint working!",
+        "received": clean_body,
+        "status": 200
+    }), 200
 
 
 # ─────────────────────────────────────────────
-# 7. CATEGORISE ENDPOINT — 30 req/min
+# 8. CATEGORISE ENDPOINT — 30 req/min
 # ─────────────────────────────────────────────
 @app.route("/categorise", methods=["POST"])
 @sanitise_input
 def categorise():
     clean_body = request.sanitised_body
-    return jsonify({"message": "Categorise endpoint working!", "received": clean_body, "status": 200}), 200
+    return jsonify({
+        "message": "Categorise endpoint working!",
+        "received": clean_body,
+        "status": 200
+    }), 200
+
+
+# ─────────────────────────────────────────────
+# 9. TEST SANITISATION ENDPOINT
+# ─────────────────────────────────────────────
+@app.route("/test-sanitise", methods=["POST"])
+@sanitise_input
+def test_sanitise():
+    clean_body = request.sanitised_body
+    return jsonify({
+        "message": "Input is clean and safe!",
+        "received": clean_body,
+        "status": 200
+    }), 200
 
 
 # ─────────────────────────────────────────────
