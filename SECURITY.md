@@ -431,3 +431,77 @@ Testing that flask-limiter correctly blocks excessive requests.
 All Medium and Low findings will be resolved on Day 12 using flask-talisman.
 
 *Last updated: Day 7 — 22 April 2026 | AI Developer 3*
+
+---
+
+## 9. PII Audit Results (Day 9)
+
+**Audit Date:** 28 April 2026
+**Audited By:** AI Developer 3
+**Files Checked:** app.py, routes/sanitisation.py, security_test.py
+
+---
+
+### What is PII?
+PII (Personally Identifiable Information) is any data that could identify a specific person, such as names, email addresses, phone numbers, passwords, or credit card numbers.
+
+---
+
+### PII Audit Checklist
+
+| Check | Result | Notes |
+|-------|--------|-------|
+| Hardcoded passwords in code | ✅ CLEAN | No hardcoded passwords found |
+| Hardcoded API keys in code | ✅ CLEAN | All keys loaded from .env via os.getenv() |
+| Email addresses in prompts | ✅ CLEAN | No emails hardcoded in prompts |
+| Personal data in log statements | ✅ CLEAN | Logs only metadata (endpoint, status, timestamp) |
+| Sensitive data printed to console | ✅ CLEAN | No print statements with sensitive data |
+| Full request body logged | ✅ CLEAN | Only sanitised body used, never logged in full |
+| User data sent to Groq API | ✅ CLEAN | Only audit text sent, no personal identifiers |
+| Phone numbers in code | ✅ CLEAN | None found |
+| Credit card patterns in code | ✅ CLEAN | None found |
+
+---
+
+### Prompt Safety Check
+
+| Endpoint | What is sent to Groq AI | PII Risk |
+|----------|------------------------|----------|
+| /describe | Audit item text only | ✅ Low |
+| /recommend | Audit item text only | ✅ Low |
+| /categorise | Audit item text only | ✅ Low |
+| /generate-report | Audit summary text only | ✅ Low |
+| /query | User question only | ✅ Low |
+
+**All endpoints send only audit-related text to the Groq API — no personal identifiers.**
+
+---
+
+### Log Safety Check
+
+| Log Type | What is Logged | PII Risk |
+|----------|---------------|----------|
+| Error logs | Endpoint name + error message | ✅ Safe |
+| Warning logs | Status codes only | ✅ Safe |
+| Request logs | HTTP method + endpoint + status | ✅ Safe |
+| Response logs | Not logged | ✅ Safe |
+
+---
+
+### Findings
+
+**Total PII Issues Found: 0**
+**Result: ✅ CLEAN — No PII leaks detected in any file**
+
+---
+
+### Recommendations
+
+1. Never add personal user data to AI prompts in future development
+2. If user names or emails are needed for context, mask them before sending (e.g. "user_***@gmail.com")
+3. Ensure all future developers follow the same logging standards
+4. Run this PII audit again after any major feature addition
+
+---
+
+*Last updated: Day 9 — 28 April 2026 | AI Developer 3*
