@@ -1,47 +1,20 @@
-"""
-app.py — Flask Entry Point with Security Headers + Rate Limiting
-Tool-21: Audit Planning and Scheduling
-AI Developer 3 — Day 8 Task
-"""
-
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from routes.sanitisation import sanitise_input
+from werkzeug.exceptions import HTTPException
+
+from routes.analyse_document import analyse_document_bp
+from routes.batch_process import batch_process_bp
+from routes.describe import describe_bp
+from routes.generate_report import generate_report_bp
+from routes.query import query_bp
+from routes.recommend import recommend_bp
+from services.rag_service import RagService
+
 
 app = Flask(__name__)
+app.config["JSON_SORT_KEYS"] = False
 
-
-# ─────────────────────────────────────────────
-# 1. ADD SECURITY HEADERS TO EVERY RESPONSE
-# This fixes all ZAP findings from Day 7
-# ─────────────────────────────────────────────
-@app.after_request
-def add_security_headers(response):
-    # Fixes Finding 4 — X-Content-Type-Options Missing
-    response.headers['X-Content-Type-Options'] = 'nosniff'
-
-    # Fixes Finding 1 — Content Security Policy Not Set
-    response.headers['Content-Security-Policy'] = "default-src 'self'"
-
-    # Fixes ZAP — X-Frame-Options Missing
-    # Stops your app being loaded inside another website (clickjacking)
-    response.headers['X-Frame-Options'] = 'DENY'
-
-    # Extra security headers (best practice)
-    response.headers['X-XSS-Protection'] = '1; mode=block'
-    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-
-    # Fixes Finding 3 — Hide Flask version from Server header
-    response.headers['Server'] = 'Tool-21-AI-Service'
-
-    return response
-
-
-# ─────────────────────────────────────────────
-# 2. SETUP FLASK-LIMITER
-# Default limit: 30 requests per minute per IP
-# ─────────────────────────────────────────────
 limiter = Limiter(
     get_remote_address,
     app=app,
@@ -49,118 +22,79 @@ limiter = Limiter(
     storage_uri="memory://",
 )
 
+rag_service = RagService()
+if not rag_service.has_documents():
+    rag_service.seed_from_directory()
 
-# ─────────────────────────────────────────────
-# 3. CUSTOM ERROR HANDLER FOR 429
-# Returns clear error message with retry_after
-# ─────────────────────────────────────────────
+app.register_blueprint(describe_bp)
+app.register_blueprint(recommend_bp)
+app.register_blueprint(generate_report_bp)
+app.register_blueprint(analyse_document_bp)
+app.register_blueprint(batch_process_bp)
+app.register_blueprint(query_bp)
+
+
+@app.after_request
+def add_security_headers(response):
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Content-Security-Policy"] = "default-src 'self'"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Server"] = "Tool-21-AI-Service"
+    return response
+
+
 @app.errorhandler(429)
-def rate_limit_exceeded(e):
-    return jsonify({
-        "error": "Too Many Requests",
-        "message": "You have exceeded the allowed request limit. Please slow down.",
-        "retry_after": 60,
-        "retry_after_unit": "seconds",
-        "status": 429
-    }), 429
+def rate_limit_exceeded(_error):
+    return (
+        jsonify(
+            {
+                "error": "Too Many Requests",
+                "message": "You have exceeded the allowed request limit. Please slow down.",
+                "retry_after": 60,
+                "retry_after_unit": "seconds",
+                "status": 429,
+            }
+        ),
+        429,
+    )
 
 
-# ─────────────────────────────────────────────
-# 4. HEALTH CHECK ENDPOINT
-# No rate limit on health check
-# ─────────────────────────────────────────────
+@app.errorhandler(HTTPException)
+def handle_http_exception(error: HTTPException):
+    return jsonify({"error": error.description, "status": error.code}), error.code
+
+
+@app.errorhandler(Exception)
+def handle_unexpected_exception(error: Exception):
+    return jsonify({"error": str(error), "status": 500}), 500
+
+
 @app.route("/health", methods=["GET"])
 @limiter.exempt
 def health():
-    return jsonify({
-        "status": "ok",
-        "message": "AI service is running",
-        "security_headers": {
-            "X-Content-Type-Options": "nosniff",
-            "X-Frame-Options": "DENY",
-            "Content-Security-Policy": "default-src 'self'",
-            "X-XSS-Protection": "1; mode=block"
-        },
-        "rate_limits": {
-            "default": "30 requests per minute",
-            "generate_report": "10 requests per minute"
-        }
-    }), 200
+    return (
+        jsonify(
+            {
+                "status": "ok",
+                "message": "AI service is running",
+                "rag_seeded": rag_service.has_documents(),
+                "security_headers": {
+                    "X-Content-Type-Options": "nosniff",
+                    "X-Frame-Options": "DENY",
+                    "Content-Security-Policy": "default-src 'self'",
+                    "X-XSS-Protection": "1; mode=block",
+                },
+                "rate_limits": {
+                    "default": "30 requests per minute",
+                    "generate_report": "10 requests per minute",
+                },
+            }
+        ),
+        200,
+    )
 
 
-# ─────────────────────────────────────────────
-# 5. DESCRIBE ENDPOINT — 30 req/min
-# ─────────────────────────────────────────────
-@app.route("/describe", methods=["POST"])
-@sanitise_input
-def describe():
-    clean_body = request.sanitised_body
-    return jsonify({
-        "message": "Describe endpoint working!",
-        "received": clean_body,
-        "status": 200
-    }), 200
-
-
-# ─────────────────────────────────────────────
-# 6. RECOMMEND ENDPOINT — 30 req/min
-# ─────────────────────────────────────────────
-@app.route("/recommend", methods=["POST"])
-@sanitise_input
-def recommend():
-    clean_body = request.sanitised_body
-    return jsonify({
-        "message": "Recommend endpoint working!",
-        "received": clean_body,
-        "status": 200
-    }), 200
-
-
-# ─────────────────────────────────────────────
-# 7. GENERATE REPORT — Strict 10 req/min
-# ─────────────────────────────────────────────
-@app.route("/generate-report", methods=["POST"])
-@limiter.limit("10 per minute")
-@sanitise_input
-def generate_report():
-    clean_body = request.sanitised_body
-    return jsonify({
-        "message": "Generate report endpoint working!",
-        "received": clean_body,
-        "status": 200
-    }), 200
-
-
-# ─────────────────────────────────────────────
-# 8. CATEGORISE ENDPOINT — 30 req/min
-# ─────────────────────────────────────────────
-@app.route("/categorise", methods=["POST"])
-@sanitise_input
-def categorise():
-    clean_body = request.sanitised_body
-    return jsonify({
-        "message": "Categorise endpoint working!",
-        "received": clean_body,
-        "status": 200
-    }), 200
-
-
-# ─────────────────────────────────────────────
-# 9. TEST SANITISATION ENDPOINT
-# ─────────────────────────────────────────────
-@app.route("/test-sanitise", methods=["POST"])
-@sanitise_input
-def test_sanitise():
-    clean_body = request.sanitised_body
-    return jsonify({
-        "message": "Input is clean and safe!",
-        "received": clean_body,
-        "status": 200
-    }), 200
-
-
-# ─────────────────────────────────────────────
-# RUN THE APP
-# ─────────────────────────────────────────────
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
