@@ -1,0 +1,2 @@
+Risk management in audit scheduling requires identifying dependencies, resource constraints, deadline pressure, and review bottlenecks.
+High-risk items should be monitored more frequently and escalated before delays affect delivery.
