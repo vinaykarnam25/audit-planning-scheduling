@@ -1,0 +1,2 @@
+Resource capacity should be reviewed before assigning audit work.
+Overloaded reviewers or shared dependencies can create bottlenecks that delay delivery.

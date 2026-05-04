@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 
 from services.groq_client import GroqClientService
@@ -9,6 +10,11 @@ from services.rag_service import RagService
 
 groq_client = GroqClientService()
 rag_service = RagService()
+
+
+def _compact_text(text: str, limit: int = 1200) -> str:
+    compact = " ".join(text.split())
+    return compact[:limit]
 
 
 def generate_description(item_text: str, context: str = "") -> dict:
@@ -22,7 +28,7 @@ def generate_description(item_text: str, context: str = "") -> dict:
     }
     return groq_client.generate_json(
         system_prompt=template,
-        user_prompt=f"Context: {context or 'N/A'}\nInput: {item_text}",
+        user_prompt=f"Context: {_compact_text(context or 'N/A', 500)}\nInput: {_compact_text(item_text, 600)}",
         fallback_payload=fallback,
     )
 
@@ -50,7 +56,7 @@ def generate_recommendations(item_text: str) -> dict:
     }
     return groq_client.generate_json(
         system_prompt=template,
-        user_prompt=f"Input: {item_text}",
+        user_prompt=f"Input: {_compact_text(item_text, 700)}",
         fallback_payload=fallback,
     )
 
@@ -72,11 +78,31 @@ def generate_report(item_text: str) -> dict:
             "Escalate timeline risk if dependencies remain open.",
         ],
     }
-    return groq_client.generate_json(
+    report = groq_client.generate_json(
         system_prompt=template,
-        user_prompt=f"Input: {item_text}",
+        user_prompt=f"Input: {_compact_text(item_text, 700)}",
         fallback_payload=fallback,
     )
+    report.setdefault("meta", {})
+    report["meta"]["stream_ready"] = True
+    return report
+
+
+def stream_report_events(item_text: str) -> list[str]:
+    report = generate_report(item_text)
+    ordered_sections = [
+        ("title", report.get("title", "")),
+        ("executive_summary", report.get("executive_summary", "")),
+        ("overview", report.get("overview", "")),
+        ("top_items", report.get("top_items", [])),
+        ("recommendations", report.get("recommendations", [])),
+    ]
+    events = []
+    for section, value in ordered_sections:
+        payload = {"section": section, "content": value}
+        events.append(f"data: {json.dumps(payload)}\n\n")
+    events.append(f"data: {json.dumps({'done': True, 'meta': report.get('meta', {})})}\n\n")
+    return events
 
 
 def generate_query_answer(question: str, context_items: list[dict]) -> dict:
@@ -87,7 +113,7 @@ def generate_query_answer(question: str, context_items: list[dict]) -> dict:
     }
     return groq_client.generate_json(
         system_prompt=template,
-        user_prompt=f"Question: {question}\nContext:\n{context_block}",
+        user_prompt=f"Question: {_compact_text(question, 300)}\nContext:\n{_compact_text(context_block, 900)}",
         fallback_payload=fallback,
     )
 
@@ -95,11 +121,15 @@ def generate_query_answer(question: str, context_items: list[dict]) -> dict:
 def analyse_document_text(document_text: str) -> dict:
     findings = []
     lines = [line.strip() for line in document_text.splitlines() if line.strip()]
-    for line in lines[:5]:
+    risk_words = {"delay", "risk", "blocked", "late", "overdue", "dependency", "escalate"}
+    for line in lines[:8]:
+        lowered = line.lower()
+        severity = "high" if any(word in lowered for word in {"overdue", "blocked", "escalate"}) else "medium" if any(word in lowered for word in risk_words) else "low"
         findings.append(
             {
-                "finding": line[:160],
-                "risk_level": "medium" if "delay" in line.lower() or "risk" in line.lower() else "low",
+                "finding": line[:180],
+                "risk_level": severity,
+                "insight_type": "risk" if severity in {"high", "medium"} else "observation",
             }
         )
 
@@ -108,10 +138,13 @@ def analyse_document_text(document_text: str) -> dict:
             {
                 "finding": "No significant insights were identified from the submitted text.",
                 "risk_level": "low",
+                "insight_type": "observation",
             }
         )
 
+    summary = "Document contains planning signals that should be reviewed for ownership, timing, and dependencies."
     return {
+        "summary": summary,
         "findings": findings,
         "generated_at": datetime.now(UTC).isoformat(),
     }

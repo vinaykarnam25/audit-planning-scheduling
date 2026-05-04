@@ -1,0 +1,2 @@
+Communication plans should define who receives updates, how often, and which issues require escalation.
+Consistent communication reduces confusion when timelines or priorities shift.

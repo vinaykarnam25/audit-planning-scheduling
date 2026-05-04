@@ -1,0 +1,2 @@
+Audit timeline planning should include kickoff, evidence collection, review checkpoints, remediation windows, and final sign-off dates.
+Tracking milestones early helps teams detect schedule drift before deadlines are missed.

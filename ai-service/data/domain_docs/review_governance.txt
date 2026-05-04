@@ -1,0 +1,2 @@
+Review governance requires clear ownership, escalation paths, and approval checkpoints.
+Managers should know who signs off each stage and when blockers must be escalated.

@@ -1,0 +1,2 @@
+Evidence readiness checks reduce rework and improve audit confidence.
+Teams should confirm documents, approvals, and source systems are available before fieldwork starts.

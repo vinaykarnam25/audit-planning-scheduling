@@ -105,6 +105,20 @@ class RagService:
     def has_documents(self) -> bool:
         return self._collection.count() > 0 or self._seed_marker.exists()
 
+    def document_count(self) -> int:
+        try:
+            return int(self._collection.count())
+        except Exception:
+            return 0
+
+    @classmethod
+    def preload_embedding_model(cls) -> None:
+        cls._embed_texts(["audit planning warmup"])
+
+    @classmethod
+    def model_preloaded(cls) -> bool:
+        return cls._model is not None
+
     @classmethod
     def _embed_texts(cls, texts: list[str]) -> list[list[float]]:
         try:

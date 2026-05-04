@@ -1,0 +1,2 @@
+Remediation follow-up should track open findings, due dates, owners, and evidence of closure.
+Unresolved actions should be highlighted in subsequent planning cycles.

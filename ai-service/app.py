@@ -1,8 +1,7 @@
 from flask import Flask, jsonify
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 from werkzeug.exceptions import HTTPException
 
+from extensions import limiter
 from routes.analyse_document import analyse_document_bp
 from routes.batch_process import batch_process_bp
 from routes.describe import describe_bp
@@ -15,16 +14,12 @@ from services.rag_service import RagService
 app = Flask(__name__)
 app.config["JSON_SORT_KEYS"] = False
 
-limiter = Limiter(
-    get_remote_address,
-    app=app,
-    default_limits=["30 per minute"],
-    storage_uri="memory://",
-)
+limiter.init_app(app)
 
 rag_service = RagService()
-if not rag_service.has_documents():
+if not rag_service.has_documents() or rag_service.document_count() < 10:
     rag_service.seed_from_directory()
+rag_service.preload_embedding_model()
 
 app.register_blueprint(describe_bp)
 app.register_blueprint(recommend_bp)
@@ -80,6 +75,8 @@ def health():
                 "status": "ok",
                 "message": "AI service is running",
                 "rag_seeded": rag_service.has_documents(),
+                "rag_document_count": rag_service.document_count(),
+                "embedding_model_preloaded": rag_service.model_preloaded(),
                 "security_headers": {
                     "X-Content-Type-Options": "nosniff",
                     "X-Frame-Options": "DENY",

@@ -1,0 +1,2 @@
+Status reporting should summarise progress, upcoming deadlines, unresolved risks, and dependencies.
+Weekly reporting improves alignment between audit teams and stakeholders.
